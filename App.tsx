@@ -7,7 +7,7 @@ import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import { Job, JobStage, JobHistory, User } from './types';
 import { getJobs, saveJobs, seedData, getCurrentUser, loginUser, logoutUser } from './services/storageService';
-import { STAGE_ORDER, STAGE_DEFAULT_ASSIGNEE } from './constants';
+import { STAGE_DEFAULT_ASSIGNEE, getNextStage } from './constants';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -15,19 +15,12 @@ const App: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
 
   useEffect(() => {
-    // Auth Check
     const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
+    if (currentUser) setUser(currentUser);
 
-    // Data Load
     const loadedJobs = getJobs();
-    if (loadedJobs.length === 0) {
-      setJobs(seedData());
-    } else {
-      setJobs(loadedJobs);
-    }
+    if (loadedJobs.length === 0) setJobs(seedData());
+    else setJobs(loadedJobs);
   }, []);
 
   const handleLogin = (u: User) => {
@@ -45,12 +38,11 @@ const App: React.FC = () => {
     const now = Date.now();
     const newJob: Job = {
       ...newJobData,
-      id: `JOB-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `JOB-${now}`,
       createdAt: now,
       updatedAt: now,
       history: [{ stage: JobStage.COUNTER, timestamp: now }]
     };
-    
     const updatedJobs = [...jobs, newJob];
     setJobs(updatedJobs);
     saveJobs(updatedJobs);
@@ -60,18 +52,11 @@ const App: React.FC = () => {
   const handleAdvanceJob = (id: string) => {
     const updatedJobs = jobs.map(job => {
       if (job.id === id) {
-        const currentIdx = STAGE_ORDER.indexOf(job.currentStage);
-        if (currentIdx < STAGE_ORDER.length - 1) {
-          const nextStage = STAGE_ORDER[currentIdx + 1];
+        const nextStage = getNextStage(job.currentStage, job.type);
+        if (nextStage) {
           const now = Date.now();
-          
-          const historyEntry: JobHistory = {
-            stage: nextStage,
-            timestamp: now
-          };
-
+          const historyEntry: JobHistory = { stage: nextStage, timestamp: now };
           const nextAssignee = STAGE_DEFAULT_ASSIGNEE[nextStage] || job.assignedTo;
-
           return {
             ...job,
             currentStage: nextStage,
@@ -96,29 +81,14 @@ const App: React.FC = () => {
     }
   };
 
-  if (!user) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (!user) return <Login onLogin={handleLogin} />;
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab} user={user} onLogout={handleLogout}>
       {activeTab === 'dashboard' && <Dashboard jobs={jobs} />}
-      {activeTab === 'jobs' && (
-        <JobBoard 
-          jobs={jobs} 
-          onAdvance={handleAdvanceJob}
-          onDelete={handleDeleteJob}
-        />
-      )}
-      {activeTab === 'new' && (
-        <NewJob 
-          onSubmit={handleCreateJob} 
-          onCancel={() => setActiveTab('jobs')} 
-        />
-      )}
-      {activeTab === 'admin' && user.role === 'Admin' && (
-        <AdminPanel jobs={jobs} />
-      )}
+      {activeTab === 'jobs' && <JobBoard jobs={jobs} onAdvance={handleAdvanceJob} onDelete={handleDeleteJob} />}
+      {activeTab === 'new' && <NewJob onSubmit={handleCreateJob} onCancel={() => setActiveTab('jobs')} />}
+      {activeTab === 'admin' && user.role === 'Admin' && <AdminPanel jobs={jobs} />}
     </Layout>
   );
 };
