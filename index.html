@@ -15,116 +15,162 @@
   </style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root"></div>
 
-  <!-- React + ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- React and ReactDOM from CDN -->
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 
-  <script type="text/babel">
+<script type="text/babel">
 
-// ----------- Constants & Storage ----------
+/* ====== Constants and JobStage ====== */
 const JobStage = {
-  COUNTER: 'Counter',
-  PROCESSING: 'Processing',
-  COMPLETED: 'Completed'
+  COUNTER: 'COUNTER',
+  DESIGN: 'DESIGN',
+  PRODUCTION: 'PRODUCTION',
+  FINISHING: 'FINISHING',
+  CASHIER: 'CASHIER',
+  COMPLETED: 'COMPLETED'
 };
+
+const APP_VERSION = '1.1.0';
+
+const STAGE_COLORS = {
+  [JobStage.COUNTER]: 'bg-slate-100 text-slate-700 border-slate-300',
+  [JobStage.DESIGN]: 'bg-blue-100 text-blue-700 border-blue-300',
+  [JobStage.PRODUCTION]: 'bg-purple-100 text-purple-700 border-purple-300',
+  [JobStage.FINISHING]: 'bg-orange-100 text-orange-700 border-orange-300',
+  [JobStage.CASHIER]: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+  [JobStage.COMPLETED]: 'bg-gray-200 text-gray-500 border-gray-300'
+};
+
+const STAGE_ORDER = [
+  JobStage.COUNTER,
+  JobStage.DESIGN,
+  JobStage.PRODUCTION,
+  JobStage.FINISHING,
+  JobStage.CASHIER,
+  JobStage.COMPLETED
+];
+
+const EMPLOYEES = [
+  'Alice (Counter)',
+  'Bob (Designer)',
+  'Charlie (Production)',
+  'David (Finisher)',
+  'Eva (Cashier)'
+];
 
 const STAGE_DEFAULT_ASSIGNEE = {
-  Counter: 'User A',
-  Processing: 'User B',
-  Completed: 'User C'
+  [JobStage.COUNTER]: 'Alice (Counter)',
+  [JobStage.DESIGN]: 'Bob (Designer)',
+  [JobStage.PRODUCTION]: 'Charlie (Production)',
+  [JobStage.FINISHING]: 'David (Finisher)',
+  [JobStage.CASHIER]: 'Eva (Cashier)',
+  [JobStage.COMPLETED]: 'Eva (Cashier)'
 };
 
-function getJobs() {
-  return JSON.parse(localStorage.getItem('jobs') || '[]');
+const JOB_DEFAULTS = {
+  customerName: 'Unknown Customer',
+  type: 'Print',
+  priority: 'Normal',
+  currentStage: JobStage.COUNTER,
+  price: 0,
+  assignedTo: 'Unassigned',
+  description: 'No description provided'
+};
+
+function getNextStage(currentStage, jobType) {
+  const currentIndex = STAGE_ORDER.indexOf(currentStage);
+  if (currentIndex >= STAGE_ORDER.length - 1) return null;
+  let nextStage = STAGE_ORDER[currentIndex + 1];
+  if (jobType === 'Xerox' && nextStage === JobStage.DESIGN) {
+    const designIndex = STAGE_ORDER.indexOf(JobStage.DESIGN);
+    nextStage = STAGE_ORDER[designIndex + 1];
+  }
+  return nextStage;
 }
+
+/* ====== LocalStorage Services ====== */
+function getJobs() {
+  const data = localStorage.getItem('jobs');
+  return data ? JSON.parse(data) : [];
+}
+
 function saveJobs(jobs) {
   localStorage.setItem('jobs', JSON.stringify(jobs));
 }
-function getCurrentUser() {
-  return JSON.parse(localStorage.getItem('currentUser') || 'null');
-}
-function loginUser(user) {
-  localStorage.setItem('currentUser', JSON.stringify(user));
-}
-function logoutUser() {
-  localStorage.removeItem('currentUser');
-}
+
 function seedData() {
+  const now = Date.now();
   const jobs = [
-    { id: 'JOB-1001', title: 'Business Card', type: 'Print', currentStage: JobStage.COUNTER, assignedTo: 'User A', history: [], createdAt: Date.now(), updatedAt: Date.now() }
+    {id:'JOB-1001', customerName:'John Doe', type:'Print', priority:'Normal', currentStage:JobStage.COUNTER, assignedTo:'Alice (Counter)', description:'Business cards', createdAt:now, updatedAt:now, history:[{stage:JobStage.COUNTER, timestamp:now}]}
   ];
   saveJobs(jobs);
   return jobs;
 }
-function getNextStage(currentStage) {
-  if(currentStage === JobStage.COUNTER) return JobStage.PROCESSING;
-  if(currentStage === JobStage.PROCESSING) return JobStage.COMPLETED;
-  return null;
+
+function getCurrentUser() {
+  const user = localStorage.getItem('currentUser');
+  return user ? JSON.parse(user) : null;
 }
 
-// ----------- Components ----------
-function Layout({ activeTab, onTabChange, user, onLogout, children }) {
+function loginUser(user) {
+  localStorage.setItem('currentUser', JSON.stringify(user));
+}
+
+function logoutUser() {
+  localStorage.removeItem('currentUser');
+}
+
+/* ====== Components ====== */
+
+function Layout({children, activeTab, onTabChange, user, onLogout}) {
   return (
-    <div>
-      <nav className="bg-blue-600 text-white p-4 flex justify-between">
-        <div className="flex space-x-4">
-          <button onClick={() => onTabChange('dashboard')} className="hover:underline">Dashboard</button>
-          <button onClick={() => onTabChange('jobs')} className="hover:underline">Jobs</button>
-          <button onClick={() => onTabChange('new')} className="hover:underline">New Job</button>
-          {user.role === 'Admin' && <button onClick={() => onTabChange('admin')} className="hover:underline">Admin</button>}
-        </div>
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">PrintFlow Pro</h1>
         <div>
-          <span className="mr-4">{user.name}</span>
-          <button onClick={onLogout} className="bg-red-500 px-2 py-1 rounded hover:bg-red-600">Logout</button>
+          <span className="mr-4">{user.name} ({user.role})</span>
+          <button className="bg-red-500 text-white px-2 py-1 rounded" onClick={onLogout}>Logout</button>
         </div>
-      </nav>
-      <main className="p-6">{children}</main>
+      </div>
+      <div className="flex space-x-2 mb-4">
+        <button onClick={()=>onTabChange('dashboard')} className={`px-2 py-1 rounded ${activeTab==='dashboard'?'bg-blue-500 text-white':'bg-gray-200'}`}>Dashboard</button>
+        <button onClick={()=>onTabChange('jobs')} className={`px-2 py-1 rounded ${activeTab==='jobs'?'bg-blue-500 text-white':'bg-gray-200'}`}>Jobs</button>
+        <button onClick={()=>onTabChange('new')} className={`px-2 py-1 rounded ${activeTab==='new'?'bg-blue-500 text-white':'bg-gray-200'}`}>New Job</button>
+        {user.role==='Admin' && <button onClick={()=>onTabChange('admin')} className={`px-2 py-1 rounded ${activeTab==='admin'?'bg-blue-500 text-white':'bg-gray-200'}`}>Admin</button>}
+      </div>
+      <div>{children}</div>
     </div>
   );
 }
 
-function Login({ onLogin }) {
-  const [name, setName] = React.useState('');
-  const [role, setRole] = React.useState('User');
-
-  return (
-    <div className="max-w-md mx-auto mt-20 bg-white p-6 rounded shadow">
-      <h1 className="text-2xl font-bold mb-4 text-center">Login</h1>
-      <input className="w-full p-2 border mb-2 rounded" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
-      <select className="w-full p-2 border mb-4 rounded" value={role} onChange={e => setRole(e.target.value)}>
-        <option>User</option>
-        <option>Admin</option>
-      </select>
-      <button className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700" onClick={() => onLogin({name, role})}>Login</button>
-    </div>
-  );
-}
-
-function Dashboard({ jobs }) {
+function Dashboard({jobs}) {
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Dashboard</h2>
+      <h2 className="text-xl font-bold mb-2">Dashboard</h2>
       <p>Total Jobs: {jobs.length}</p>
     </div>
   );
 }
 
-function JobBoard({ jobs, onAdvance, onDelete }) {
+function JobBoard({jobs, onAdvance, onDelete}) {
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Jobs</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {jobs.map(job => (
-          <div key={job.id} className="p-4 bg-white rounded shadow">
-            <h3 className="font-semibold">{job.title}</h3>
-            <p>Stage: {job.currentStage}</p>
-            <p>Assigned To: {job.assignedTo}</p>
-            <div className="mt-2 space-x-2">
-              {job.currentStage !== JobStage.COMPLETED && <button onClick={() => onAdvance(job.id)} className="bg-green-500 px-2 py-1 rounded text-white hover:bg-green-600">Advance</button>}
-              <button onClick={() => onDelete(job.id)} className="bg-red-500 px-2 py-1 rounded text-white hover:bg-red-600">Delete</button>
+      <h2 className="text-xl font-bold mb-2">Job Board</h2>
+      <div className="space-y-2">
+        {jobs.map(job=>(
+          <div key={job.id} className={`p-2 border rounded ${STAGE_COLORS[job.currentStage]}`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <strong>{job.customerName}</strong> - {job.type} - {job.assignedTo}
+              </div>
+              <div className="space-x-1">
+                {job.currentStage!==JobStage.COMPLETED && <button className="bg-green-500 text-white px-1 rounded" onClick={()=>onAdvance(job.id)}>Next Stage</button>}
+                <button className="bg-red-500 text-white px-1 rounded" onClick={()=>onDelete(job.id)}>Delete</button>
+              </div>
             </div>
           </div>
         ))}
@@ -133,81 +179,104 @@ function JobBoard({ jobs, onAdvance, onDelete }) {
   );
 }
 
-function NewJob({ onSubmit, onCancel }) {
-  const [title, setTitle] = React.useState('');
-  const [type, setType] = React.useState('Print');
-
+function NewJob({onSubmit, onCancel}) {
+  const [customerName,setCustomerName] = React.useState('');
+  const [type,setType] = React.useState('Print');
+  const [description,setDescription] = React.useState('');
+  const handleSubmit = ()=> {
+    if(customerName===''){alert('Customer Name required');return;}
+    onSubmit({customerName,type,description,priority:'Normal',currentStage:JobStage.COUNTER,assignedTo:STAGE_DEFAULT_ASSIGNEE[JobStage.COUNTER]});
+  };
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded shadow">
-      <h2 className="text-xl font-bold mb-4">New Job</h2>
-      <input className="w-full p-2 border mb-2 rounded" placeholder="Job Title" value={title} onChange={e => setTitle(e.target.value)} />
-      <input className="w-full p-2 border mb-2 rounded" placeholder="Job Type" value={type} onChange={e => setType(e.target.value)} />
-      <div className="flex space-x-2 mt-2">
-        <button className="bg-blue-600 px-4 py-2 text-white rounded hover:bg-blue-700" onClick={() => { onSubmit({title,type,currentStage:JobStage.COUNTER,assignedTo:STAGE_DEFAULT_ASSIGNEE[JobStage.COUNTER]}); setTitle(''); setType('Print'); }}>Submit</button>
-        <button className="bg-gray-400 px-4 py-2 text-white rounded hover:bg-gray-500" onClick={onCancel}>Cancel</button>
+    <div className="space-y-2">
+      <h2 className="text-xl font-bold mb-2">New Job</h2>
+      <input type="text" placeholder="Customer Name" className="border p-1 rounded w-full" value={customerName} onChange={e=>setCustomerName(e.target.value)} />
+      <select className="border p-1 rounded w-full" value={type} onChange={e=>setType(e.target.value)}>
+        <option value="Print">Print</option>
+        <option value="Xerox">Xerox</option>
+      </select>
+      <textarea className="border p-1 rounded w-full" placeholder="Description" value={description} onChange={e=>setDescription(e.target.value)}></textarea>
+      <div className="space-x-2">
+        <button className="bg-blue-500 text-white px-2 py-1 rounded" onClick={handleSubmit}>Create Job</button>
+        <button className="bg-gray-300 px-2 py-1 rounded" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
 }
 
-function AdminPanel({ jobs }) {
+function Login({onLogin}) {
+  const [name,setName] = React.useState('');
+  const [role,setRole] = React.useState('User');
+  const handleLogin = ()=>{
+    if(name===''){alert('Enter name');return;}
+    onLogin({name,role});
+  };
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-4">Admin Panel</h2>
-      <p>Jobs Overview:</p>
-      <ul className="list-disc pl-6">
-        {jobs.map(job => <li key={job.id}>{job.title} - {job.currentStage}</li>)}
-      </ul>
+    <div className="p-4 max-w-md mx-auto mt-20 border rounded space-y-2 bg-white">
+      <h2 className="text-xl font-bold mb-2">Login</h2>
+      <input type="text" placeholder="Name" className="border p-1 rounded w-full" value={name} onChange={e=>setName(e.target.value)} />
+      <select className="border p-1 rounded w-full" value={role} onChange={e=>setRole(e.target.value)}>
+        <option value="User">User</option>
+        <option value="Admin">Admin</option>
+      </select>
+      <button className="bg-blue-500 text-white px-2 py-1 rounded w-full" onClick={handleLogin}>Login</button>
     </div>
   );
 }
 
-// ----------- Main App ----------
+function AdminPanel({jobs}) {
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-2">Admin Panel</h2>
+      <p>Manage {jobs.length} jobs here.</p>
+    </div>
+  );
+}
+
+/* ====== Main App Component ====== */
 function App() {
-  const [user, setUser] = React.useState(getCurrentUser());
-  const [activeTab, setActiveTab] = React.useState('dashboard');
-  const [jobs, setJobsState] = React.useState(getJobs().length ? getJobs() : seedData());
+  const [user,setUser] = React.useState(getCurrentUser());
+  const [activeTab,setActiveTab] = React.useState('dashboard');
+  const [jobs,setJobs] = React.useState(getJobs().length===0 ? seedData() : getJobs());
 
-  const handleLogin = (u) => { setUser(u); loginUser(u); setActiveTab('dashboard'); };
-  const handleLogout = () => { setUser(null); logoutUser(); };
-
-  const handleCreateJob = (newJobData) => {
-    const now = Date.now();
-    const newJob = { ...newJobData, id:'JOB-'+Math.floor(1000+Math.random()*9000), createdAt:now, updatedAt:now, history:[{stage:JobStage.COUNTER,timestamp:now}]};
-    const updatedJobs = [...jobs, newJob];
-    setJobsState(updatedJobs);
-    saveJobs(updatedJobs);
-    setActiveTab('jobs');
+  const handleLoginUser = (u)=>{
+    setUser(u); loginUser(u); setActiveTab('dashboard');
   };
-
-  const handleAdvanceJob = (id) => {
-    const updatedJobs = jobs.map(job => {
+  const handleLogoutUser = ()=>{
+    setUser(null); logoutUser();
+  };
+  const handleCreateJob = (newJobData)=>{
+    const now = Date.now();
+    const newJob = {...newJobData, id:`JOB-${Math.floor(1000+Math.random()*9000)}`, createdAt:now, updatedAt:now, history:[{stage:JobStage.COUNTER, timestamp:now}]};
+    const updatedJobs = [...jobs,newJob];
+    setJobs(updatedJobs); saveJobs(updatedJobs); setActiveTab('jobs');
+  };
+  const handleAdvanceJob = (id)=>{
+    const updatedJobs = jobs.map(job=>{
       if(job.id===id){
-        const nextStage = getNextStage(job.currentStage);
+        const nextStage = getNextStage(job.currentStage, job.type);
         if(nextStage){
           const now = Date.now();
+          const historyEntry = {stage:nextStage, timestamp:now};
           const nextAssignee = STAGE_DEFAULT_ASSIGNEE[nextStage] || job.assignedTo;
-          return {...job, currentStage: nextStage, assignedTo: nextAssignee, updatedAt: now, completedAt: nextStage===JobStage.COMPLETED? now:undefined, history:[...job.history,{stage:nextStage,timestamp:now}]};
+          return {...job, currentStage:nextStage, assignedTo:nextAssignee, updatedAt:now, completedAt: nextStage===JobStage.COMPLETED ? now : undefined, history:[...job.history, historyEntry]};
         }
       }
       return job;
     });
-    setJobsState(updatedJobs);
-    saveJobs(updatedJobs);
+    setJobs(updatedJobs); saveJobs(updatedJobs);
   };
-
-  const handleDeleteJob = (id) => {
+  const handleDeleteJob = (id)=>{
     if(window.confirm('Are you sure you want to delete this job?')){
       const updatedJobs = jobs.filter(j=>j.id!==id);
-      setJobsState(updatedJobs);
-      saveJobs(updatedJobs);
+      setJobs(updatedJobs); saveJobs(updatedJobs);
     }
   };
 
-  if(!user) return <Login onLogin={handleLogin} />;
+  if(!user) return <Login onLogin={handleLoginUser} />;
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab} user={user} onLogout={handleLogout}>
+    <Layout activeTab={activeTab} onTabChange={setActiveTab} user={user} onLogout={handleLogoutUser}>
       {activeTab==='dashboard' && <Dashboard jobs={jobs} />}
       {activeTab==='jobs' && <JobBoard jobs={jobs} onAdvance={handleAdvanceJob} onDelete={handleDeleteJob} />}
       {activeTab==='new' && <NewJob onSubmit={handleCreateJob} onCancel={()=>setActiveTab('jobs')} />}
@@ -216,9 +285,9 @@ function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+/* ====== Render App ====== */
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 
-  </script>
+</script>
 </body>
 </html>
