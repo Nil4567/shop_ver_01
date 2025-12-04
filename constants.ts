@@ -11,7 +11,7 @@ export const STAGE_COLORS: Record<JobStage, string> = {
   [JobStage.COMPLETED]: 'bg-gray-200 text-gray-500 border-gray-300',
 };
 
-export const STAGE_ORDER = [
+export const STAGE_ORDER: JobStage[] = [
   JobStage.COUNTER,
   JobStage.DESIGN,
   JobStage.PRODUCTION,
@@ -20,7 +20,7 @@ export const STAGE_ORDER = [
   JobStage.COMPLETED,
 ];
 
-export const EMPLOYEES = [
+export const EMPLOYEES: string[] = [
   'Alice (Counter)',
   'Bob (Designer)',
   'Charlie (Production)',
@@ -39,7 +39,6 @@ export const STAGE_DEFAULT_ASSIGNEE: Record<JobStage, string> = {
 };
 
 // Fallback values for data migration (Future Proofing)
-// If a new feature adds a field, old backups won't crash
 export const JOB_DEFAULTS = {
   customerName: 'Unknown Customer',
   type: 'Print',
@@ -48,4 +47,25 @@ export const JOB_DEFAULTS = {
   price: 0,
   assignedTo: 'Unassigned',
   description: 'No description provided',
+};
+
+/**
+ * Determines the next stage based on current stage and job type.
+ * Smart Workflow: Xerox jobs skip the DESIGN stage.
+ */
+export const getNextStage = (currentStage: JobStage, jobType: string): JobStage | null => {
+  const currentIndex = STAGE_ORDER.indexOf(currentStage);
+
+  // Standard End of Line
+  if (currentIndex >= STAGE_ORDER.length - 1) return null;
+
+  let nextStage = STAGE_ORDER[currentIndex + 1];
+
+  // Exception: Xerox jobs skip DESIGN and go straight to PRODUCTION
+  if (jobType === 'Xerox' && nextStage === JobStage.DESIGN) {
+    const designIndex = STAGE_ORDER.indexOf(JobStage.DESIGN);
+    nextStage = STAGE_ORDER[designIndex + 1]; // Move to Production
+  }
+
+  return nextStage;
 };
