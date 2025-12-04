@@ -1,0 +1,4 @@
+if (!username || !password) {
+  setError('Both username and password are required!');
+  return;
+}
